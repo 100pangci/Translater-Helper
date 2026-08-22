@@ -1,0 +1,287 @@
+name: Build and Release
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: write
+
+env:
+  # 强制让 GitHub Actions 使用 Node.js 24 引擎运行插件，消除老版本弃用警告
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # 普通推送时取消同分支旧任务；打 tag 的构建不取消
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Tauri Linux 构建依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 配置 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 编译产物
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund
+
+      # 本项目无独立测试脚本，npm run build 已包含 vue-tsc 类型检查 + Vite 构建
+      - name: 前端构建检查
+        run: npm run build
+
+      # 验证 Rust 端可在 Linux 下编译（当前仓库暂无 cargo 测试用例）
+      - name: 运行 Rust 测试
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 校验标签格式
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::标签 $GITHUB_REF_NAME 不符合 v主.次.修订 格式"
+            exit 1
+          fi
+
+      # 关键：让构建产物内部的版本号与 tag 保持一致，而不是沿用 tauri.conf.json 里写死的旧版本
+      - name: 将标签版本号同步到 tauri.conf.json 与 package.json
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = $env:GITHUB_REF_NAME.TrimStart("v")
+          foreach ($file in @("src-tauri/tauri.conf.json", "package.json")) {
+            $json = Get-Content $file -Raw | ConvertFrom-Json
+            $json.version = $tag
+            $json | ConvertTo-Json -Depth 32 | Set-Content $file -Encoding utf8NoBOM
+          }
+          Write-Host "已将版本号同步为 $tag"
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 配置 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 编译产物
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund
+
+      # build:release = tauri build --bundles nsis，同时会产出裸 exe 作为便携版
+      - name: 构建 NSIS 安装包与便携版
+        run: npm run build:release
+
+      - name: 重命名为规范格式
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Move-Item "src-tauri/target/release/bundle/nsis/TransHelper_*_x64-setup.exe" "transhelper-${{ github.ref_name }}-windows-x64-setup.exe"
+          Copy-Item "src-tauri/target/release/transhelper.exe" "transhelper-${{ github.ref_name }}-windows-x64-portable.exe"
+
+      - name: 上传 Windows 构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            transhelper-${{ github.ref_name }}-windows-x64-setup.exe
+            transhelper-${{ github.ref_name }}-windows-x64-portable.exe
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 校验标签格式
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::标签 $GITHUB_REF_NAME 不符合 v主.次.修订 格式"
+            exit 1
+          fi
+
+      - name: 将标签版本号同步到 tauri.conf.json 与 package.json
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          for file in src-tauri/tauri.conf.json package.json; do
+            tmp="$(mktemp)"
+            jq --arg v "$TAG" '.version = $v' "$file" > "$tmp" && mv "$tmp" "$file"
+          done
+          echo "已将版本号同步为 $TAG"
+
+      - name: 安装 Tauri Linux 构建依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 配置 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 编译产物
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund
+
+      - name: 构建 deb 与 AppImage
+        run: npm run tauri build -- --bundles deb appimage
+
+      - name: 重命名为规范格式
+        run: |
+          mv src-tauri/target/release/bundle/deb/*.deb "transhelper-${{ github.ref_name }}-linux-amd64.deb"
+          mv src-tauri/target/release/bundle/appimage/*.AppImage "transhelper-${{ github.ref_name }}-linux-amd64.AppImage"
+
+      - name: 上传 Linux 构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            transhelper-${{ github.ref_name }}-linux-amd64.deb
+            transhelper-${{ github.ref_name }}-linux-amd64.AppImage
+
+  build-macos:
+    name: Build macOS (Apple Silicon)
+    runs-on: macos-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 校验标签格式
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::标签 $GITHUB_REF_NAME 不符合 v主.次.修订 格式"
+            exit 1
+          fi
+
+      - name: 将标签版本号同步到 tauri.conf.json 与 package.json
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          for file in src-tauri/tauri.conf.json package.json; do
+            tmp="$(mktemp)"
+            jq --arg v "$TAG" '.version = $v' "$file" > "$tmp" && mv "$tmp" "$file"
+          done
+          echo "已将版本号同步为 $TAG"
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 配置 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 编译产物
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund
+
+      # 只产出 .app，跳过耗时的 dmg 打包
+      - name: 构建 macOS 应用
+        run: npm run tauri build -- --bundles app
+
+      - name: 打包 .app 为 zip
+        run: |
+          cd src-tauri/target/release/bundle/macos
+          ditto -c -k --sequesterRsrc TransHelper.app "$GITHUB_WORKSPACE/transhelper-${{ github.ref_name }}-macos.zip"
+
+      - name: 上传 macOS 构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: transhelper-${{ github.ref_name }}-macos.zip
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - build-windows
+      - build-linux
+      - build-macos
+
+    steps:
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 创建 Release 并上传产物
+        uses: softprops/action-gh-release@v2
+        with:
+          # 修复点：显式指定 name，把 tag 中的版本号写进 Release 标题
+          # （VNDB-GUI-Rs 未传 name，标题不会带上版本号）
+          name: 偶译析 ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
+          body: |
+            偶译析 · 翻译解析助手 **${{ github.ref_name }}**
+
+            ### 下载说明
+            | 平台 | 文件 | 说明 |
+            | --- | --- | --- |
+            | Windows | `*-windows-x64-setup.exe` | NSIS 安装包（推荐） |
+            | Windows | `*-windows-x64-portable.exe` | 免安装便携版，单文件直接运行 |
+            | Linux | `*-linux-amd64.deb` / `*-linux-amd64.AppImage` | amd64 架构 |
+            | macOS | `*-macos.zip` | Apple Silicon，解压后将 TransHelper.app 拖入「应用程序」 |
+
+            ### 首次使用
+            启动后进入「设置」页配置大模型 API（支持 OpenAI 兼容协议与 Anthropic 协议），详见项目 README。
+          files: |
+            artifacts/windows/*
+            artifacts/linux/*
+            artifacts/macos/*
