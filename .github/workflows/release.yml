@@ -59,6 +59,9 @@ jobs:
     runs-on: windows-latest
     if: startsWith(github.ref, 'refs/tags/v')
     needs: test
+    env:
+      APP_VERSION: ${{ github.ref_name }}
+      TRANSLATER_HELPER_VERSION: ${{ github.ref_name }}
 
     steps:
       - name: 拉取代码
@@ -126,6 +129,9 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     needs: test
+    env:
+      APP_VERSION: ${{ github.ref_name }}
+      TRANSLATER_HELPER_VERSION: ${{ github.ref_name }}
 
     steps:
       - name: 拉取代码
@@ -191,6 +197,9 @@ jobs:
     runs-on: macos-latest
     if: startsWith(github.ref, 'refs/tags/v')
     needs: test
+    env:
+      APP_VERSION: ${{ github.ref_name }}
+      TRANSLATER_HELPER_VERSION: ${{ github.ref_name }}
 
     steps:
       - name: 拉取代码
