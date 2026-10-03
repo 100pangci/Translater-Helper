@@ -1,6 +1,6 @@
 [package]
 name = "transhelper"
-version = "0.1.0"
+version = "1.0.1"
 description = "偶译析 · 翻译解析助手"
 authors = ["you"]
 edition = "2021"

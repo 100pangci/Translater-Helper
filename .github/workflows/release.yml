@@ -50,7 +50,7 @@ jobs:
       - name: 前端构建检查
         run: npm run build
 
-      # 验证 Rust 端可在 Linux 下编译（当前仓库暂无 cargo 测试用例）
+      # 验证 Rust 端可在 Linux 下编译，并回归 NVIDIA / Wayland 渲染兼容逻辑
       - name: 运行 Rust 测试
         run: cargo test --manifest-path src-tauri/Cargo.toml
 

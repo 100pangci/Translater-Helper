@@ -34,6 +34,7 @@
 - **Node.js** ≥ 18（含 npm）
 - **Rust** stable 工具链（Windows 下需 MSVC 工具链）
 - **Windows 10/11**（内置 WebView2；当前构建脚本面向 Windows NSIS）
+- **Linux**：支持 AppImage / deb；运行依赖 GTK 3 与 WebKitGTK 4.1，源码构建还需对应开发包（Fedora：`webkit2gtk4.1-devel`、`gtk3-devel`）
 
 ## 🚀 快速开始
 
@@ -203,6 +204,20 @@ macOS:    ~/Library/Application Support/com.translater.helper/config.json
 ## ❓常见问题
 
 <details>
+<summary><b>Linux AppImage 界面能显示，但按钮和输入框没有反应</b></summary>
+
+NVIDIA 驱动 + Wayland 下，WebKitGTK 的 DMA-BUF 渲染可能卡住，造成整个界面看似无法点击。应用启动时会自动检测此组合，仅对本进程设置 `WEBKIT_DISABLE_DMABUF_RENDERER=1`；不修改系统显卡、桌面或全局环境变量，其他显卡及明确选择 X11 的环境保持原样。
+
+尚未包含此修复的旧版 AppImage 可临时这样启动（替换为实际文件路径）：
+
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=1 ./transhelper-v1.0.0-linux-amd64.AppImage
+```
+
+兼容处理会牺牲部分图形加速性能。如果驱动 / WebKitGTK 更新后想恢复默认渲染，可在启动时显式设置 `WEBKIT_DISABLE_DMABUF_RENDERER=0`，应用不会覆盖该值。
+</details>
+
+<details>
 <summary><b>启动后提示“尚未配置 API Key”</b></summary>
 
 首次使用需在设置页完成配置并保存。已配置仍提示时，尝试重启应用。
@@ -248,4 +263,4 @@ macOS:    ~/Library/Application Support/com.translater.helper/config.json
 
 ---
 
-*版本 0.1.0 · 使用 Tauri 2 构建*
+*版本 1.0.1 · 使用 Tauri 2 构建*
