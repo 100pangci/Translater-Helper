@@ -206,12 +206,14 @@ macOS:    ~/Library/Application Support/com.translater.helper/config.json
 <details>
 <summary><b>Linux AppImage 界面能显示，但按钮和输入框没有反应</b></summary>
 
-NVIDIA 驱动 + Wayland 下，WebKitGTK 的 DMA-BUF 渲染可能卡住，造成整个界面看似无法点击。应用启动时会自动检测此组合，仅对本进程设置 `WEBKIT_DISABLE_DMABUF_RENDERER=1`；不修改系统显卡、桌面或全局环境变量，其他显卡及明确选择 X11 的环境保持原样。
+Linux 下使用 NVIDIA 驱动时，WebKitGTK 的 DMA-BUF 渲染可能卡住，造成整个界面看似无法点击，或进入设置后不能输入、拖动窗口。应用启动时会检测已加载的 NVIDIA 驱动，仅对本进程设置 `WEBKIT_DISABLE_DMABUF_RENDERER=1`；不修改系统显卡、桌面、GTK 后端或全局环境变量，其他显卡保持原样。
+
+注意：AppImage 的 GTK 启动脚本会强制使用 X11 / XWayland，不能以 `GDK_BACKEND=x11` 为由跳过兼容处理；`v1.0.1` 的自动检测存在此遗漏。
 
 尚未包含此修复的旧版 AppImage 可临时这样启动（替换为实际文件路径）：
 
 ```bash
-WEBKIT_DISABLE_DMABUF_RENDERER=1 ./transhelper-v1.0.0-linux-amd64.AppImage
+WEBKIT_DISABLE_DMABUF_RENDERER=1 ./transhelper-v1.0.1-linux-amd64.AppImage
 ```
 
 兼容处理会牺牲部分图形加速性能。如果驱动 / WebKitGTK 更新后想恢复默认渲染，可在启动时显式设置 `WEBKIT_DISABLE_DMABUF_RENDERER=0`，应用不会覆盖该值。
@@ -260,7 +262,8 @@ WEBKIT_DISABLE_DMABUF_RENDERER=1 ./transhelper-v1.0.0-linux-amd64.AppImage
 - 修改窗口标题/尺寸：`src-tauri/tauri.conf.json` → `app.windows`
 - 修改默认提示词：`src-tauri/src/config.rs` 中 `DEFAULT_SYSTEM_PROMPT` 与 `src/views/SettingsView.vue` 中同名常量需保持一致
 - 新增 Tauri command：在 `lib.rs` 的 `generate_handler![]` 中注册
+- Linux AppImage 界面回归：`xvfb-run -a dbus-run-session -- python3 tests/linux_appimage_smoke.py <AppImage 路径>`，使用隔离配置和测试字符，验证设置页鼠标输入、保存与返回；CI 在上传发布包前执行该检查。
 
 ---
 
-*版本 1.0.1 · 使用 Tauri 2 构建*
+*版本 1.0.2 · 使用 Tauri 2 构建*

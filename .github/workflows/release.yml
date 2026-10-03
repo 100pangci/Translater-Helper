@@ -50,7 +50,7 @@ jobs:
       - name: 前端构建检查
         run: npm run build
 
-      # 验证 Rust 端可在 Linux 下编译，并回归 NVIDIA / Wayland 渲染兼容逻辑
+      # 验证 Rust 端可在 Linux 下编译，并回归 NVIDIA / AppImage 渲染兼容逻辑
       - name: 运行 Rust 测试
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
@@ -179,6 +179,13 @@ jobs:
       - name: 构建 deb 与 AppImage
         run: npm run tauri build -- --bundles deb appimage
 
+      - name: 安装 Linux 界面测试依赖
+        run: sudo apt-get install -y python3-pyatspi python3-gi at-spi2-core xvfb xauth xdotool
+
+      - name: 回归 AppImage 设置页输入与保存
+        timeout-minutes: 2
+        run: xvfb-run -a --server-args="-screen 0 1280x900x24" dbus-run-session -- python3 tests/linux_appimage_smoke.py src-tauri/target/release/bundle/appimage/*.AppImage
+
       - name: 重命名为规范格式
         run: |
           mv src-tauri/target/release/bundle/deb/*.deb "transhelper-${{ github.ref_name }}-linux-amd64.deb"
@@ -287,6 +294,9 @@ jobs:
             | Windows | `*-windows-x64-portable.exe` | 免安装便携版，单文件直接运行 |
             | Linux | `*-linux-amd64.deb` / `*-linux-amd64.AppImage` | amd64 架构 |
             | macOS | `*-macos.zip` | Apple Silicon，解压后将 TransHelper.app 拖入「应用程序」 |
+
+            ### Linux 兼容说明
+            NVIDIA 环境默认启用 WebKit 兼容渲染，覆盖 AppImage 的 X11 / XWayland 启动路径。发布前自动检查设置页鼠标输入、保存与重新加载，无需手动添加兼容启动参数。
 
             ### 首次使用
             启动后进入「设置」页配置大模型 API（支持 OpenAI 兼容协议与 Anthropic 协议），详见项目 README。
