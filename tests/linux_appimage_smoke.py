@@ -76,6 +76,11 @@ def main(appimage):
     with tempfile.TemporaryDirectory(prefix="transhelper-ui-") as directory:
         root = Path(directory)
         env = dict(os.environ)
+        # Never let an inherited real Wayland socket bypass the isolated Xvfb.
+        env.pop("WAYLAND_DISPLAY", None)
+        env.pop("WAYLAND_SOCKET", None)
+        env["XDG_SESSION_TYPE"] = "x11"
+        env["TRANSHELPER_GDK_BACKEND"] = "x11"
         for key, subdir in (
             ("XDG_CONFIG_HOME", "config"),
             ("XDG_DATA_HOME", "data"),

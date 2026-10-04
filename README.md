@@ -206,17 +206,15 @@ macOS:    ~/Library/Application Support/com.translater.helper/config.json
 <details>
 <summary><b>Linux AppImage 界面能显示，但按钮和输入框没有反应</b></summary>
 
-Linux 下使用 NVIDIA 驱动时，WebKitGTK 的 DMA-BUF 渲染可能卡住，造成整个界面看似无法点击，或进入设置后不能输入、拖动窗口。应用启动时会检测已加载的 NVIDIA 驱动，仅对本进程设置 `WEBKIT_DISABLE_DMABUF_RENDERER=1`；不修改系统显卡、桌面、GTK 后端或全局环境变量，其他显卡保持原样。
+Linux 下使用 NVIDIA 驱动时，WebKitGTK / XWayland 可能出现画面与实际控件状态不同步：页面实际上收到了点击和输入，但画面没有正常更新，看起来像无法输入或返回。仅禁用 DMA-BUF 并不能覆盖此问题。
 
-注意：AppImage 的 GTK 启动脚本会强制使用 X11 / XWayland，不能以 `GDK_BACKEND=x11` 为由跳过兼容处理；`v1.0.1` 的自动检测存在此遗漏。
+应用在 GTK 初始化前处理兼容设置：NVIDIA 环境默认禁用 WebKit DMA-BUF 与合成绘制；AppImage 在可连接 Wayland 时优先使用原生 Wayland，并保留 X11 回退。只影响本应用进程，不修改系统显卡、显示布局、输入法或全局环境变量。其他显卡的默认行为保持原样。
 
-尚未包含此修复的旧版 AppImage 可临时这样启动（替换为实际文件路径）：
+注意：AppImage 的 GTK 启动脚本会强制使用 X11 / XWayland。`v1.0.1` 漏启用兼容渲染，`v1.0.2` 虽禁用了 DMA-BUF，但仍未切换原生窗口后端，因此不能认为这两版已完整修复。
 
-```bash
-WEBKIT_DISABLE_DMABUF_RENDERER=1 ./transhelper-v1.0.1-linux-amd64.AppImage
-```
+本机验证：原生 Wayland + 软件绘制下，先使用输入/焦点诊断确认后台正常，再去掉诊断注入，用户实机复测英文、中文、反复进入设置与返回、持续拖动窗口均正常。Xvfb 自动测试只覆盖隔离 X11 的基础交互，不代表真实 NVIDIA / Wayland 环境已通过。
 
-兼容处理会牺牲部分图形加速性能。如果驱动 / WebKitGTK 更新后想恢复默认渲染，可在启动时显式设置 `WEBKIT_DISABLE_DMABUF_RENDERER=0`，应用不会覆盖该值。
+兼容处理会牺牲部分图形加速性能。程序保留显式 `WEBKIT_DISABLE_DMABUF_RENDERER` / `WEBKIT_DISABLE_COMPOSITING_MODE` 值；恢复默认渲染可同时设为 `0`。仅为排错，可使用 `TRANSHELPER_GDK_BACKEND=x11` 选择旧窗口后端，或 `TRANSHELPER_GDK_BACKEND=wayland` 强制原生后端；无需修改 KDE 设置。旧版 AppImage 仍会覆盖普通 `GDK_BACKEND`，不能仅用该变量让旧包切换后端。
 </details>
 
 <details>
@@ -266,4 +264,4 @@ WEBKIT_DISABLE_DMABUF_RENDERER=1 ./transhelper-v1.0.1-linux-amd64.AppImage
 
 ---
 
-*版本 1.0.2 · 使用 Tauri 2 构建*
+*版本 1.0.3 · 使用 Tauri 2 构建*

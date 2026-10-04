@@ -296,7 +296,8 @@ jobs:
             | macOS | `*-macos.zip` | Apple Silicon，解压后将 TransHelper.app 拖入「应用程序」 |
 
             ### Linux 兼容说明
-            NVIDIA 环境默认启用 WebKit 兼容渲染，覆盖 AppImage 的 X11 / XWayland 启动路径。发布前自动检查设置页鼠标输入、保存与重新加载，无需手动添加兼容启动参数。
+            NVIDIA + Wayland 环境下，AppImage 优先使用原生 Wayland 并启用稳定的软件绘制，修复画面与输入/返回状态不同步的问题。发布前自动检查隔离 X11 环境的设置页输入、保存与重新加载；真实 Wayland 环境另经人工验证。
+            Windows 保持原有 WebView2 运行路径，共享前端表单和返回逻辑未改动。
 
             ### 首次使用
             启动后进入「设置」页配置大模型 API（支持 OpenAI 兼容协议与 Anthropic 协议），详见项目 README。
