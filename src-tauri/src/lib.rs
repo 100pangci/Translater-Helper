@@ -1,6 +1,7 @@
 mod app_version;
 mod config;
 mod llm;
+mod proxy;
 
 use tauri::Manager;
 

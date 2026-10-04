@@ -197,7 +197,8 @@ pub async fn chat_stream(
         return Ok(());
     }
 
-    let client = reqwest::Client::builder()
+    let client = crate::proxy::configure_client(reqwest::Client::builder())
+        .map_err(|e| format!("配置网络代理失败: {e}"))?
         .timeout(Duration::from_secs(600))
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;

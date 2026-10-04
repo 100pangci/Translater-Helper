@@ -13,6 +13,7 @@
   - OpenAI 兼容协议：DeepSeek、通义千问、Kimi、智谱 GLM 等
   - Anthropic 协议：Claude 系列
 - **流式输出**：SSE 逐字渲染，实时看到生成过程
+- **自动代理**：跟随标准代理环境变量；Linux KDE 下也读取系统手动 HTTP(S) 代理设置
 - **单轮追问**：针对翻译结果继续提问，自动携带原文与最近一轮结果作为上下文
 - **Markdown 渲染**：回答以 Markdown 排版展示，并经 [DOMPurify](https://github.com/cure53/DOMPurify) 消毒防 XSS
 - **思考深度调节**：OpenAI 协议发送 `reasoning_effort`；Anthropic 协议自动开启 extended thinking
@@ -197,7 +198,7 @@ macOS:    ~/Library/Application Support/com.translater.helper/config.json
 ## 🔒 隐私与安全
 
 - **API Key 仅存本地**：不会上传到任何第三方服务器；但以明文保存，请勿将配置文件分享给他人
-- **直连模式**：请求由本机直接发往你填写的 API 地址，无中转服务器
+- **本机发起请求**：请求直连你填写的 API，或按系统代理设置转发；应用自身不提供中转服务器
 - **无历史记录**：应用不持久化任何翻译内容，关闭即消失
 - **渲染消毒**：模型返回的 Markdown 经 DOMPurify 过滤后再插入 DOM
 
@@ -264,4 +265,4 @@ Linux 下使用 NVIDIA 驱动时，WebKitGTK / XWayland 可能出现画面与实
 
 ---
 
-*版本 1.0.3 · 使用 Tauri 2 构建*
+*版本 1.0.4 · 使用 Tauri 2 构建*
