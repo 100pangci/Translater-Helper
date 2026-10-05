@@ -207,15 +207,17 @@ macOS:    ~/Library/Application Support/com.translater.helper/config.json
 <details>
 <summary><b>Linux AppImage 界面能显示，但按钮和输入框没有反应</b></summary>
 
-Linux 下使用 NVIDIA 驱动时，WebKitGTK / XWayland 可能出现画面与实际控件状态不同步：页面实际上收到了点击和输入，但画面没有正常更新，看起来像无法输入或返回。仅禁用 DMA-BUF 并不能覆盖此问题。
+Linux 版本在 GTK / WebKit 初始化前默认设置进程级
+`WEBKIT_DISABLE_DMABUF_RENDERER=1`，规避部分 Wayland / NVIDIA 环境下的
+WebKitGTK 渲染异常（包括启动协议错误或界面不更新）。
 
-应用在 GTK 初始化前处理兼容设置：NVIDIA 环境默认禁用 WebKit DMA-BUF 与合成绘制；AppImage 在可连接 Wayland 时优先使用原生 Wayland，并保留 X11 回退。只影响本应用进程，不修改系统显卡、显示布局、输入法或全局环境变量。其他显卡的默认行为保持原样。
+只设置这一个兼容变量，不检测显卡、不强制选择 GTK 后端，也不禁用合成绘制；
+不修改系统配置。已显式设置该变量时保留原值，可用
+`WEBKIT_DISABLE_DMABUF_RENDERER=0` 恢复 DMA-BUF 渲染。
 
-注意：AppImage 的 GTK 启动脚本会强制使用 X11 / XWayland。`v1.0.1` 漏启用兼容渲染，`v1.0.2` 虽禁用了 DMA-BUF，但仍未切换原生窗口后端，因此不能认为这两版已完整修复。
-
-本机验证：原生 Wayland + 软件绘制下，先使用输入/焦点诊断确认后台正常，再去掉诊断注入，用户实机复测英文、中文、反复进入设置与返回、持续拖动窗口均正常。Xvfb 自动测试只覆盖隔离 X11 的基础交互，不代表真实 NVIDIA / Wayland 环境已通过。
-
-兼容处理会牺牲部分图形加速性能。程序保留显式 `WEBKIT_DISABLE_DMABUF_RENDERER` / `WEBKIT_DISABLE_COMPOSITING_MODE` 值；恢复默认渲染可同时设为 `0`。仅为排错，可使用 `TRANSHELPER_GDK_BACKEND=x11` 选择旧窗口后端，或 `TRANSHELPER_GDK_BACKEND=wayland` 强制原生后端；无需修改 KDE 设置。旧版 AppImage 仍会覆盖普通 `GDK_BACKEND`，不能仅用该变量让旧包切换后端。
+AppImage 的 GTK 启动脚本可能选择 X11 / XWayland，本应用不再覆盖该选择。
+修改源码需重新构建才生效，旧版 AppImage 的启动策略不会自动改变。
+Xvfb 自动测试覆盖隔离 X11 的设置页交互，不代表真实 Wayland 下的画面更新已通过。
 </details>
 
 <details>

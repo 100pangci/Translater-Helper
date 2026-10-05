@@ -80,7 +80,7 @@ def main(appimage):
         env.pop("WAYLAND_DISPLAY", None)
         env.pop("WAYLAND_SOCKET", None)
         env["XDG_SESSION_TYPE"] = "x11"
-        env["TRANSHELPER_GDK_BACKEND"] = "x11"
+        env["GDK_BACKEND"] = "x11"
         for key, subdir in (
             ("XDG_CONFIG_HOME", "config"),
             ("XDG_DATA_HOME", "data"),
